@@ -15,7 +15,7 @@ import {
   FileText,
   Mail,
   Youtube,
-  Images
+  Image
 } from 'lucide-react';
 import { LoadingWave } from '@/components/LoadingWave';
 
@@ -37,7 +37,7 @@ export default function Home() {
     { id: 'blog', name: 'Blog Post', icon: FileText, color: 'bg-green-600' },
     { id: 'newsletter', name: 'Newsletter', icon: Mail, color: 'bg-purple-600' },
     { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'bg-red-600' },
-    { id: 'carousel', name: 'Carousel', icon: Images, color: 'bg-orange-600' },
+    { id: 'carousel', name: 'Carousel', icon: Image, color: 'bg-orange-600' },
   ];
 
   const togglePlatform = (platformId: string) => {
@@ -124,6 +124,9 @@ The future is multi-platform. The tools are here now.`;
       formData.append('creationMode', 'standard');
       formData.append('postCount', '3');
       formData.append('tone', 'Professional and engaging');
+      
+      // Add selected platforms - this is crucial for generating content for specific platforms
+      formData.append('selectedPlatforms', JSON.stringify(selectedPlatforms));
 
       simulateProgress();
 
@@ -141,6 +144,23 @@ The future is multi-platform. The tools are here now.`;
       setProgress(100);
       sessionStorage.setItem('result', JSON.stringify(data));
       sessionStorage.setItem('selectedPlatforms', JSON.stringify(selectedPlatforms));
+      
+      // Store original input content for chatbot reference
+      // The API returns the original input, so we can use that or build it here
+      if (data.originalInput) {
+        sessionStorage.setItem('originalInput', data.originalInput);
+      } else {
+        // Build original input from what was sent
+        let originalInput = content || '';
+        if (files.length > 0) {
+          originalInput += '\n\n[Files uploaded: ' + files.map(f => f.name).join(', ') + ']';
+        }
+        if (url) {
+          originalInput += '\n\n[URL: ' + url + ']';
+        }
+        sessionStorage.setItem('originalInput', originalInput);
+      }
+      
       router.push('/results');
       
     } catch (err: any) {
@@ -228,7 +248,7 @@ The future is multi-platform. The tools are here now.`;
             ref={fileInputRef}
             type="file"
             onChange={handleFileSelect}
-            accept=".txt,.md,.pdf,.doc,.docx,.ppt,.pptx"
+            accept=".txt,.md,.pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp"
             className="hidden"
             multiple
           />
@@ -308,17 +328,66 @@ The future is multi-platform. The tools are here now.`;
 
         {/* Selected Files Display */}
         {files.length > 0 && (
-          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
-              Selected Files ({files.length})
+          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs sm:text-sm font-semibold text-blue-900 mb-3">
+              📎 Uploaded Files ({files.length})
             </p>
-            <div className="space-y-1">
-              {files.map((file, index) => (
-                <div key={index} className="text-xs sm:text-sm text-gray-600 truncate">
-                  • {file.name}
-                </div>
-              ))}
+            <div className="space-y-2">
+              {files.map((file, index) => {
+                const fileExtension = file.name.split('.').pop()?.toLowerCase();
+                const isImage = fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
+                const isPDF = fileExtension === 'pdf';
+                const isText = fileExtension && ['txt', 'md'].includes(fileExtension);
+                const isDoc = fileExtension && ['doc', 'docx'].includes(fileExtension);
+                
+                const getFileIcon = () => {
+                  if (isImage) return '🖼️';
+                  if (isPDF) return '📄';
+                  if (isText) return '📝';
+                  if (isDoc) return '📘';
+                  return '📎';
+                };
+                
+                const getFileType = () => {
+                  if (isImage) return 'Image';
+                  if (isPDF) return 'PDF';
+                  if (isText) return 'Text';
+                  if (isDoc) return 'Document';
+                  return 'File';
+                };
+                
+                const formatFileSize = (bytes: number) => {
+                  if (bytes < 1024) return bytes + ' B';
+                  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                };
+                
+                return (
+                  <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-blue-100">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-base flex-shrink-0">{getFileIcon()}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                          {file.name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {getFileType()} • {formatFileSize(file.size)}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}
+                      className="ml-2 text-red-500 hover:text-red-700 text-xs flex-shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
             </div>
+            <p className="mt-3 text-xs text-blue-700">
+              ✅ These files will be sent to GPT for content generation
+            </p>
           </div>
         )}
       </main>
